@@ -209,8 +209,38 @@ Add a dependency installation script: scripts/install-dependencies.sh
 chmod +x scripts/install-dependencies.sh
 Run only when in new machine ./scripts/install-dependencies.sh
 
+# Architecture after Phase 3
+requirements.txt
+    │
+    ├── FastAPI and Uvicorn
+    ├── HTTPX
+    ├── OpenTelemetry API and SDK
+    ├── OTLP exporter
+    ├── FastAPI/HTTPX/logging instrumentation
+    └── pytest tooling
+            │
+            ▼
+       Project .venv
+            │
+            ├── run-dev.sh
+            ├── run-with-otel.sh
+            └── application tests
 
+requirements-lock.txt
+    └── exact resolved versions for reproducibility
 
+//-------------------------------------------------------------------
 
+Phase-4: Configure Environment Variables
+Configure the application and OpenTelemetry behavior without hardcoding values in Python.
+
+source .venv/bin/activate
+cp .env.example .env.example.phase3-backup
+cp .env .env.phase3-backup
+Update .env files
+Update config.py
+python -m compileall app
+
+Create scripts/check-env.sh
 
 

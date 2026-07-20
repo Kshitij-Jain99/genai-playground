@@ -8,9 +8,7 @@ __pycache__/
 *$py.class
 
 # Environment variables and secrets
-.env
-.env.local
-.env.otel
+.env.*
 *.secret
 *.key
 

@@ -53,3 +53,11 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 opentelemetry-bootstrap -a install
 python -m pip check
+
+
+## Environment configuration
+
+Create a local environment file:
+
+```bash
+cp .env.example .env
