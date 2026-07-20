@@ -1,7 +1,33 @@
+# --------------------------------------------------
+# Web application
+# --------------------------------------------------
+
 fastapi
 uvicorn[standard]
 pydantic-settings
 python-dotenv
+httpx
 
+# --------------------------------------------------
+# OpenTelemetry core and export
+# --------------------------------------------------
+
+opentelemetry-api
+opentelemetry-sdk
 opentelemetry-distro
 opentelemetry-exporter-otlp
+
+# --------------------------------------------------
+# OpenTelemetry instrumentation
+# --------------------------------------------------
+
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-httpx
+opentelemetry-instrumentation-logging
+
+# --------------------------------------------------
+# Testing
+# --------------------------------------------------
+
+pytest
+pytest-asyncio

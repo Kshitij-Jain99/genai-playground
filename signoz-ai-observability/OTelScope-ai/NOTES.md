@@ -91,7 +91,7 @@ Simulated AI response
 
 //------------------------------------------------------------------------------------
 
-Phase-2: 
+Phase-2:  Add OpenTelemetry auto-instrumentation for FastAPI
 FastAPI
    ↓ automatic instrumentation
 OpenTelemetry Python Agent
@@ -143,5 +143,74 @@ set -a
 source .env
 set +a
 env | grep '^OTEL_' | sort
+
+# Architecture after Phase 2
+Browser
+   │
+   │ HTTP request
+   ▼
+FastAPI on localhost:8001
+   │
+   │ automatically created server span
+   ▼
+OpenTelemetry Python Agent
+   │
+   │ OTLP/HTTP protobuf
+   ▼
+SigNoz OpenTelemetry Collector
+localhost:4318
+   │
+   ▼
+SigNoz
+localhost:8080
+
+//------------------------------------------------------------------------------
+
+Phase-3: Define and Lock Project Dependencies
+requirements.txt -> Human-readable direct dependencies
+requirements-lock.txt -> Exact installed dependency versions
+
+# Commands:
+source .venv/bin/activate
+cp requirements.txt requirements.txt.backup
+python -m pip install --upgrade pip
+python -m pip --version
+python -m pip install -r requirements.txt
+
+opentelemetry-bootstrap -a install
+python -m pip check
+which opentelemetry-bootstrap -> must point inside bin/
+which opentelemetry-instrument -> must point inside bin/
+Do verification of various packages.
+python -m compileall app
+python -c "from app.main import app; print(app.title)"
+
+./scripts/run-with-otel.sh
+http://localhost:8001/docs
+http://localhost:8080
+Verify that otelscope-ai-api still appears.
+
+Only do this after: 
+    pip install succeeded
+    pip check succeeded
+    imports succeeded
+    application started successfully
+    traces reached SigNoz
+Generate requirements-lock.txt
+python -m pip freeze > requirements-lock.txt
+python -m pip install --dry-run -r requirements-lock.txt
+python -m pip check
+
+requirements.txt -> Use it when reviewing or intentionally adding dependencies.
+requirements-lock.txt -> Use it when you want another environment to install the exact same resolved package versions.
+Test the lock file safely in a new temp virtual environment.
+
+Add a dependency installation script: scripts/install-dependencies.sh
+chmod +x scripts/install-dependencies.sh
+Run only when in new machine ./scripts/install-dependencies.sh
+
+
+
+
 
 

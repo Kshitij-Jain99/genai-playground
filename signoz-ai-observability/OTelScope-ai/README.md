@@ -36,3 +36,20 @@ SigNoz
    │
    ▼
 Optional SigNoz MCP + AI Debugging Agent
+
+
+## Dependencies
+
+The project uses two dependency files:
+
+- `requirements.txt` contains readable direct dependencies.
+- `requirements-lock.txt` contains exact resolved package versions.
+
+### Install development dependencies
+
+```bash
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+opentelemetry-bootstrap -a install
+python -m pip check
