@@ -242,5 +242,43 @@ Update config.py
 python -m compileall app
 
 Create scripts/check-env.sh
+chmod +x scripts/check-env.sh
+Run ./scripts/check-env.sh
+
+Add validation to run-with-otel.sh
+./scripts/run-with-otel.sh
+
+Generate telemetry
+http://localhost:8001/health
+http://localhost:8001/docs -> POST /ask
+Verify traces: http://localhost:8080 -> Services -> otelscope-ai-api -> Traces
+
+//-------------------------------------------------------------------
+
+Phase-5: Manage the SigNoz Infrastructure
+
+//------------------------------------------------------------------
+
+Phase-6: Created and verified the main FastAPI app.
+
+Updated main.py, chat.py, config.py
+source .venv/bin/activate
+python -m compileall app
+python -c "from app.main import app; print(app.title, app.version)" -> Verify the application imports
+python -c "from app.main import app; print([route.path for route in app.routes])" -> Verify the routes   
+
+./scripts/run-dev.sh
+http://localhost:8001
+http://localhost:8001/health
+http://localhost:8001/docs
+Test normal question, whitespace handling, invalid input.
+
+./scripts/run-with-otel.sh
+http://localhost:8001/health
+http://localhost:8001/docs
+http://localhost:8080 -> Services and Traces
+
+
+
 
 

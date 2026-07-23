@@ -30,18 +30,21 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title=settings.app_name,
     description=(
-        "A learning project for OpenTelemetry instrumentation, "
-        "SigNoz dashboards, and Generative AI observability."
+        "An OpenTelemetry-instrumented AI application "
+        "for learning GenAI observability with SigNoz."
     ),
     version=settings.app_version,
     lifespan=lifespan,
 )
 
-# This is acceptable for local Phase 1 development.
-# Restrict allowed origins before exposing the application publicly.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost", "http://127.0.0.1"],
+    allow_origins=[
+        "http://localhost",
+        "http://127.0.0.1",
+        f"http://localhost:{settings.app_port}",
+        f"http://127.0.0.1:{settings.app_port}",
+    ],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
@@ -54,7 +57,7 @@ app.add_middleware(
     summary="Project information",
 )
 async def root() -> dict[str, str]:
-    """Return basic information about the project."""
+    """Return project information."""
 
     return {
         "project": settings.app_name,
@@ -71,7 +74,7 @@ async def root() -> dict[str, str]:
     summary="Check application health",
 )
 async def health() -> dict[str, str]:
-    """Return the current health status of the API."""
+    """Return the current health status."""
 
     return {
         "status": "healthy",
@@ -90,12 +93,7 @@ async def health() -> dict[str, str]:
 async def ask(request: AskRequest) -> AskResponse:
     """Return a deterministic simulated AI response."""
 
-    normalized_question = request.question.strip()
-
-    answer = (
-        "This is a simulated answer for: "
-        f"{normalized_question}"
-    )
+    answer = f"This is a simulated answer for: {request.question}"
 
     return AskResponse(
         answer=answer,
