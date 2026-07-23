@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.models.chat import AskRequest, AskResponse
+from app.services.agent import run_agent
 
 settings = get_settings()
 
@@ -91,12 +92,17 @@ async def health() -> dict[str, str]:
     summary="Ask the simulated AI assistant",
 )
 async def ask(request: AskRequest) -> AskResponse:
-    """Return a deterministic simulated AI response."""
+    """Run the simulated observable AI workflow."""
 
-    answer = f"This is a simulated answer for: {request.question}"
+    result = run_agent(
+        question=request.question,
+        session_id=request.session_id,
+    )
 
     return AskResponse(
-        answer=answer,
-        provider=settings.llm_provider,
-        model=settings.llm_model,
+        answer=result.answer,
+        provider=result.provider,
+        model=result.model,
+        request_id=result.request_id,
+        session_id=result.session_id,
     )

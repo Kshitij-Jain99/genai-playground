@@ -10,7 +10,8 @@ class AskRequest(BaseModel):
         json_schema_extra={
             "examples": [
                 {
-                    "question": "Why is my API slow?"
+                    "question": "Why is my API slow?",
+                    "session_id": "demo-session-001",
                 }
             ]
         }
@@ -19,23 +20,52 @@ class AskRequest(BaseModel):
     question: str = Field(
         ...,
         min_length=1,
-        max_length=2000,
+        max_length=2_000,
         description="Technical question submitted to the assistant.",
+    )
+
+    session_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        description=(
+            "Optional non-sensitive session identifier."
+        ),
     )
 
     @field_validator("question")
     @classmethod
     def validate_question(cls, value: str) -> str:
-        """Trim whitespace and reject blank questions."""
+        """Trim surrounding whitespace and reject blank questions."""
 
-        value = value.strip()
+        normalized_question = value.strip()
 
-        if not value:
+        if not normalized_question:
             raise ValueError(
                 "Question must not be empty or contain only whitespace."
             )
 
-        return value
+        return normalized_question
+
+    @field_validator("session_id")
+    @classmethod
+    def validate_session_id(
+        cls,
+        value: str | None,
+    ) -> str | None:
+        """Normalize and validate the optional session identifier."""
+
+        if value is None:
+            return None
+
+        normalized_session_id = value.strip()
+
+        if not normalized_session_id:
+            raise ValueError(
+                "Session ID must not contain only whitespace."
+            )
+
+        return normalized_session_id
 
 
 class AskResponse(BaseModel):
@@ -43,7 +73,7 @@ class AskResponse(BaseModel):
 
     answer: str = Field(
         ...,
-        description="Generated answer.",
+        description="Generated simulated answer.",
     )
 
     provider: str = Field(
@@ -54,4 +84,14 @@ class AskResponse(BaseModel):
     model: str = Field(
         ...,
         description="Configured LLM model.",
+    )
+
+    request_id: str = Field(
+        ...,
+        description="Identifier used to correlate the request with telemetry.",
+    )
+
+    session_id: str = Field(
+        ...,
+        description="Non-sensitive conversation session identifier.",
     )

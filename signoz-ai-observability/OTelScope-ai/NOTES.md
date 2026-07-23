@@ -312,4 +312,92 @@ Phase-7: OpenTelemetry Auto-Instrumentation
 -> Run the application with automatic instrumentation.
 -> Verify HTTP traces in SigNoz.
 
+python -m pip check
+python -m pip install opentelemetry-instrumentation-fastapi
+opentelemetry-bootstrap -a install
+Updated scripts/run-with-otel.sh
+chmod +x scripts/run-with-otel.sh
+bash -n scripts/run-with-otel.sh  # syntax verify
+
+Check the loaded OpenTelemetry environment:
+set -a
+source .env
+set +a
+env | grep '^OTEL_' | sort
+
+http://localhost:8080
+./scripts/run-with-otel.sh
+http://localhost:8001/ # Gen traces
+http://localhost:8001/health
+http://localhost:8001/docs
+
+Architecture: Browser
+   │
+   │ HTTP request
+   ▼
+FastAPI application
+   │
+   │ automatic FastAPI instrumentation
+   ▼
+OpenTelemetry Python Agent
+   │
+   │ OTLP/HTTP protobuf
+   ▼
+SigNoz OTLP receiver
+localhost:4318
+   │
+   ▼
+SigNoz UI
+localhost:8080
+
+//-------------------------------------------------------------------
+
+Phase-8: Add Custom AI Workflow Spans
+It adds manual child spans so that one /ask request appears as:
+POST /ask
+└── agent.run
+    ├── prompt.render
+    ├── retrieval.search
+    ├── tool.execute
+    ├── llm.generate
+    └── response.validate
+
+Create missing files:
+touch \
+  app/services/agent.py \
+  app/services/prompt.py \
+  app/services/retrieval.py \
+  app/services/tools.py \
+  app/services/llm.py \
+  app/services/validation.py \
+  app/telemetry/tracing.py \
+  tests/__init__.py \
+  tests/test_main.py
+
+Updated tracing.py, retrieval.py, prompt.py, tools.py, llm.py, validation.py, agent.py
+Updated chat.py, main.py
+Updated test_main.py
+python -m compileall app tests
+python -c "from app.main import app; print(app.title, app.version)"
+python -c "from app.services.agent import run_agent; print(run_agent)"
+python -m pip check    
+python -m pytest -v
+
+./scripts/run-dev.sh -> Test 
+./scripts/run-with-otel.sh -> Test Qs. ("Why is my API slow?", "How do OpenTelemetry spans work?", "How can SigNoz dashboards help?")
+Verify traces http://localhost:8080 and each ones attribute, must not show private information like API Key, question asked, etc.
+
+Final verification:
+python -m compileall app tests
+python -m pytest -v
+bash -n scripts/run-with-otel.sh
+git status --short
+git status --ignored --short
+
+Remove scripts.ccler file if its empty: 
+rm scripts/ccler
+
+
+
+
 
