@@ -5,8 +5,11 @@ from dataclasses import dataclass
 from app.core.config import get_settings
 from app.telemetry.metrics import tool_execution_count
 from app.telemetry.tracing import tracer
+from app.telemetry.logging import get_logger
 
 settings = get_settings()
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -27,6 +30,17 @@ def execute_diagnostic_tool(question: str) -> ToolResult:
 
     try:
         with tracer.start_as_current_span("tool.execute") as span:
+            logger.info(
+                "Tool execution started",
+                extra={
+                    "event": "tool_execution_started",
+                    "operation": "tool.execute",
+                    "status": "started",
+                    "tool_name": tool_name,
+                    "tool_type": tool_type,
+                },
+            )
+
             success = True
 
             if "health" in question.lower():
@@ -57,6 +71,17 @@ def execute_diagnostic_tool(question: str) -> ToolResult:
                 },
             )
 
+            logger.info(
+                "Tool execution completed",
+                extra={
+                    "event": "tool_execution_completed",
+                    "operation": "tool.execute",
+                    "status": "success",
+                    "tool_name": tool_name,
+                    "tool_type": tool_type,
+                },
+            )
+
             return ToolResult(
                 name=tool_name,
                 tool_type=tool_type,
@@ -74,4 +99,16 @@ def execute_diagnostic_tool(question: str) -> ToolResult:
                 "status": "error",
             },
         )
+
+        logger.exception(
+            "Tool execution failed",
+            extra={
+                "event": "tool_execution_failed",
+                "operation": "tool.execute",
+                "status": "error",
+                "tool_name": tool_name,
+                "tool_type": tool_type,
+            },
+        )
+
         raise

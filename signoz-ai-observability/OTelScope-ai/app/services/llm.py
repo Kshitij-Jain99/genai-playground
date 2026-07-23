@@ -12,7 +12,9 @@ from app.telemetry.metrics import (
     gen_ai_request_duration,
 )
 from app.telemetry.tracing import tracer
+from app.telemetry.logging import get_logger
 
+logger = get_logger(__name__)
 settings = get_settings()
 
 
@@ -34,6 +36,14 @@ def estimate_token_count(text: str) -> int:
     """Return a simple token estimate for the simulated model."""
 
     return max(1, len(text.split()))
+
+def should_simulate_failure(question: str) -> bool:
+    """Return whether a development-only LLM failure was requested."""
+
+    return (
+        settings.app_environment == "development"
+        and question.strip().lower() == "simulate llm failure"
+    )
 
 
 def estimate_request_cost(
@@ -77,6 +87,22 @@ def generate_response(
 
     try:
         with tracer.start_as_current_span("llm.generate") as span:
+            logger.info(
+                "LLM request started",
+                extra={
+                    "event": "llm_request_started",
+                    "operation": operation,
+                    "provider": provider,
+                    "model": requested_model,
+                    "status": "started",
+                },
+            )
+
+            if should_simulate_failure(question):
+                raise RuntimeError(
+                    "Simulated LLM provider failure."
+                )
+
             context_summary = context_documents[0]
 
             answer = (
@@ -123,7 +149,6 @@ def generate_response(
                 "gen_ai.response.finish_reasons",
                 [finish_reason],
             )
-
             span.set_attribute(
                 "app.llm.simulated",
                 True,
@@ -166,6 +191,27 @@ def generate_response(
                 attributes=success_attributes,
             )
 
+            duration_seconds = perf_counter() - started_at
+
+            logger.info(
+                "LLM request completed",
+                extra={
+                    "event": "llm_request_completed",
+                    "operation": operation,
+                    "provider": provider,
+                    "model": response_model,
+                    "status": "success",
+                    "finish_reason": finish_reason,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "estimated_cost": round(estimated_cost, 8),
+                    "duration_ms": round(
+                        duration_seconds * 1_000,
+                        3,
+                    ),
+                },
+            )
+
             return LLMResult(
                 answer=answer,
                 provider=provider,
@@ -177,7 +223,7 @@ def generate_response(
                 finish_reason=finish_reason,
             )
 
-    except Exception:
+    except Exception as error:
         gen_ai_request_count.add(
             1,
             attributes={
@@ -185,6 +231,21 @@ def generate_response(
                 "status": "error",
             },
         )
+
+        logger.exception(
+            "LLM request failed",
+            extra={
+                "event": "llm_request_failed",
+                "operation": operation,
+                "provider": provider,
+                "model": requested_model,
+                "status": "error",
+                "retry_count": 0,
+                "error_category": "provider_error",
+                "error_type": type(error).__name__,
+            },
+        )
+
         raise
 
     finally:

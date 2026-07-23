@@ -3,7 +3,9 @@
 from dataclasses import dataclass
 
 from app.telemetry.tracing import tracer
+from app.telemetry.logging import get_logger
 
+logger = get_logger(__name__)
 
 @dataclass(frozen=True)
 class ValidationResult:
@@ -40,9 +42,31 @@ def validate_response(answer: str) -> ValidationResult:
         )
 
         if not passed:
+            logger.error(
+                "Response validation failed",
+                extra={
+                    "event": "response_validation_failed",
+                    "operation": "response.validate",
+                    "status": "error",
+                    "validation_rule_count": rule_count,
+                    "response_length": len(answer),
+                },
+            )
+
             raise ValueError(
                 "Generated response failed validation."
             )
+
+        logger.info(
+            "Response validation completed",
+            extra={
+                "event": "response_validation_completed",
+                "operation": "response.validate",
+                "status": "success",
+                "validation_rule_count": rule_count,
+                "response_length": len(answer),
+            },
+        )
 
         return ValidationResult(
             passed=passed,

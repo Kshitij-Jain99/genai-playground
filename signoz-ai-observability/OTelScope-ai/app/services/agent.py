@@ -5,6 +5,7 @@ from time import perf_counter
 from uuid import uuid4
 
 from opentelemetry.trace import Status, StatusCode
+from app.telemetry.logging import get_logger
 
 from app.core.config import get_settings
 from app.services.llm import generate_response
@@ -20,7 +21,7 @@ from app.telemetry.metrics import (
 from app.telemetry.tracing import tracer
 
 settings = get_settings()
-
+logger = get_logger(__name__)
 
 @dataclass(frozen=True)
 class AgentResult:
@@ -45,8 +46,10 @@ def run_agent(
     started_at = perf_counter()
     status = "success"
 
+    agent_name = "technical-support-agent"
+
     common_metric_attributes = {
-        "agent_name": "technical-support-agent",
+        "agent_name": agent_name,
         "environment": settings.app_environment,
     }
 
@@ -58,7 +61,7 @@ def run_agent(
     with tracer.start_as_current_span("agent.run") as span:
         span.set_attribute(
             "app.agent.name",
-            "technical-support-agent",
+            agent_name,
         )
         span.set_attribute(
             "app.agent.version",
@@ -71,6 +74,17 @@ def run_agent(
         span.set_attribute(
             "app.session.id",
             resolved_session_id,
+        )
+
+        logger.info(
+            "Agent run started",
+            extra={
+                "event": "agent_run_started",
+                "operation": "agent.run",
+                "status": "started",
+                "agent_name": agent_name,
+                "agent_version": settings.app_version,
+            },
         )
 
         try:
@@ -104,6 +118,24 @@ def run_agent(
                 validation_result.passed,
             )
 
+            duration_seconds = perf_counter() - started_at
+
+            logger.info(
+                "Agent run completed",
+                extra={
+                    "event": "agent_run_completed",
+                    "operation": "agent.run",
+                    "provider": llm_result.provider,
+                    "model": llm_result.response_model,
+                    "status": "success",
+                    "agent_name": agent_name,
+                    "duration_ms": round(
+                        duration_seconds * 1_000,
+                        3,
+                    ),
+                },
+            )
+
             return AgentResult(
                 answer=llm_result.answer,
                 provider=llm_result.provider,
@@ -133,6 +165,18 @@ def run_agent(
                 1,
                 attributes={
                     **common_metric_attributes,
+                    "error_type": type(error).__name__,
+                },
+            )
+
+            logger.exception(
+                "Agent run failed",
+                extra={
+                    "event": "agent_run_failed",
+                    "operation": "agent.run",
+                    "status": "error",
+                    "agent_name": agent_name,
+                    "error_category": "workflow_error",
                     "error_type": type(error).__name__,
                 },
             )

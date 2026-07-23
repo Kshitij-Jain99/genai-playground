@@ -458,3 +458,99 @@ localhost:4318
         ▼
 SigNoz Metrics          
 
+//--------------------------------------------------------------------
+
+Phase-10: Structured Logs with Trace Correlatio
+It adds structured application logs to the traces and metrics already implemented.
+A request will produce:
+POST /ask trace
+├── agent.run
+│   ├── retrieval.search
+│   ├── prompt.render
+│   ├── tool.execute
+│   ├── llm.generate
+│   └── response.validate
+│
+├── metrics
+│   ├── token counts
+│   ├── request counts
+│   ├── durations
+│   └── estimated cost
+│
+└── correlated logs
+    ├── agent_run_started
+    ├── retrieval_completed
+    ├── tool_execution_started
+    ├── tool_execution_completed
+    ├── llm_request_started
+    ├── llm_request_completed
+    ├── response_validation_completed
+    └── agent_run_completed
+
+source .venv/bin/activate
+Update .env, config.py, logging.py, main.py, retrieval.py, tools.py, validation.py, llm.py, agent.py
+python -m compileall app tests
+./scripts/run-dev.sh -> http://localhost:8001/docs
+./scripts/run-with-otel.sh -> http://localhost:8001/docs
+Verify logs: http://localhost:8080
+Validate log-to-trace and trace-to-log two way correlation.
+
+Update test_logging.py
+python -m pytest -v
+Update test_main.py
+Finally do Privacy verification.Inspect successful and failed logs.
+
+Final checks:
+python -m compileall app tests
+python -m pytest -v
+python -m pip check
+bash -n scripts/run-with-otel.sh
+git status --short
+git status --ignored --short 
+
+Architecture:
+Browser
+   │
+   ▼
+POST /ask
+   │
+   ▼
+Automatic FastAPI span
+   │
+   ▼
+agent.run
+├── structured logs
+├── metrics
+│
+├── retrieval.search
+│   └── retrieval_completed log
+│
+├── prompt.render
+│
+├── tool.execute
+│   ├── tool_execution_started log
+│   └── tool_execution_completed log
+│
+├── llm.generate
+│   ├── llm_request_started log
+│   ├── llm_request_completed log
+│   └── llm_request_failed log
+│
+└── response.validate
+    ├── response_validation_completed log
+    └── response_validation_failed log
+
+Telemetry export:
+Application
+├── traces
+├── metrics
+└── structured logs
+        │
+        ▼
+OpenTelemetry SDK
+        │
+        ▼
+OTLP/HTTP :4318
+        │
+        ▼
+SigNoz    

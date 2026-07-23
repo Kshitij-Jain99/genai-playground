@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     app_service_name: str = "otelscope-ai-api"
     app_environment: str = "development"
     app_version: str = "0.1.0"
+    app_host: str = "127.0.0.1"
+    app_port: int = Field(default=8001, ge=1, le=65_535)
+
+    # Logging
+    app_log_level: str = "INFO"
+    app_log_format: str = "json"
 
     app_host: str = "127.0.0.1"
     app_port: int = Field(

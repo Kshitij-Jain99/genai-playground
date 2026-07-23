@@ -6,8 +6,11 @@ from time import perf_counter
 from app.core.config import get_settings
 from app.telemetry.metrics import retrieval_duration
 from app.telemetry.tracing import tracer
+from app.telemetry.logging import get_logger
 
 settings = get_settings()
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,7 @@ def search_knowledge_base(
     started_at = perf_counter()
     source = "local-memory"
     status = "success"
+    document_count = 0
 
     try:
         with tracer.start_as_current_span("retrieval.search") as span:
@@ -81,6 +85,7 @@ def search_knowledge_base(
                 )
 
             selected_documents = matching_documents[:top_k]
+            document_count = len(selected_documents)
 
             span.set_attribute(
                 "app.retrieval.source",
@@ -92,7 +97,7 @@ def search_knowledge_base(
             )
             span.set_attribute(
                 "app.retrieval.document_count",
-                len(selected_documents),
+                document_count,
             )
             span.set_attribute(
                 "app.retrieval.top_k",
@@ -107,6 +112,17 @@ def search_knowledge_base(
 
     except Exception:
         status = "error"
+
+        logger.exception(
+            "Retrieval failed",
+            extra={
+                "event": "retrieval_failed",
+                "operation": "retrieval.search",
+                "status": status,
+                "retrieval_source": source,
+            },
+        )
+
         raise
 
     finally:
@@ -120,3 +136,20 @@ def search_knowledge_base(
                 "status": status,
             },
         )
+
+        if status == "success":
+            logger.info(
+                "Retrieval completed",
+                extra={
+                    "event": "retrieval_completed",
+                    "operation": "retrieval.search",
+                    "status": status,
+                    "retrieval_source": source,
+                    "document_count": document_count,
+                    "top_k": top_k,
+                    "duration_ms": round(
+                        duration_seconds * 1_000,
+                        3,
+                    ),
+                },
+            )

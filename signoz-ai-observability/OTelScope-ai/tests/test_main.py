@@ -109,3 +109,18 @@ def test_ask_rejects_blank_session_id() -> None:
     )
 
     assert response.status_code == 422
+
+def test_ask_returns_safe_error_for_simulated_llm_failure() -> None:
+    response = client.post(
+        "/ask",
+        json={
+            "question": "simulate llm failure",
+            "session_id": "test-session",
+        },
+    )
+
+    assert response.status_code == 503
+
+    assert response.json() == {
+        "detail": "The simulated AI provider is unavailable."
+    }    
