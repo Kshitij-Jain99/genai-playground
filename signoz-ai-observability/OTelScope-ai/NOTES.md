@@ -278,7 +278,38 @@ http://localhost:8001/health
 http://localhost:8001/docs
 http://localhost:8080 -> Services and Traces
 
+The architecture at the end of this phase is:
+Browser / Swagger
+        │
+        ▼
+FastAPI
+├── GET /
+├── GET /health
+└── POST /ask
+        │
+        ├── Request validation
+        ├── Environment-based configuration
+        └── Simulated AI response
 
+With OpenTelemetry enabled:
+FastAPI
+   │
+   ▼
+Automatic OpenTelemetry instrumentation
+   │
+   ▼
+SigNoz Collector
+   │
+   ▼
+SigNoz traces
 
+//----------------------------------------------------------------------
+
+Phase-7: OpenTelemetry Auto-Instrumentation
+-> Replace run-with-otel.sh with a safer version.
+-> Verify the required OpenTelemetry variables.
+-> Confirm FastAPI instrumentation is installed.
+-> Run the application with automatic instrumentation.
+-> Verify HTTP traces in SigNoz.
 
 
