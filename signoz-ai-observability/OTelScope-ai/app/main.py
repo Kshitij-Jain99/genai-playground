@@ -70,7 +70,7 @@ async def runtime_error_handler(
     _: Request,
     error: RuntimeError,
 ) -> JSONResponse:
-    """Return a safe response for simulated provider failures."""
+    """Return a safe response for simulated failures."""
 
     logger.error(
         "Request failed",
@@ -78,7 +78,7 @@ async def runtime_error_handler(
             "event": "request_failed",
             "operation": "POST /ask",
             "status": "error",
-            "error_category": "runtime_error",
+            "error_category": "simulated_dependency_error",
             "error_type": type(error).__name__,
         },
     )
@@ -86,7 +86,7 @@ async def runtime_error_handler(
     return JSONResponse(
         status_code=503,
         content={
-            "detail": "The simulated AI provider is unavailable."
+            "detail": "A simulated downstream operation failed."
         },
     )
 
@@ -140,15 +140,14 @@ async def health() -> dict[str, str]:
 @app.post(
     "/ask",
     response_model=AskResponse,
-    tags=["AI"],
-    summary="Ask the simulated AI assistant",
 )
-async def ask(request: AskRequest) -> AskResponse:
-    """Run the simulated observable AI workflow."""
+def ask(request: AskRequest) -> AskResponse:
+    """Run the simulated observable AI agent."""
 
     result = run_agent(
         question=request.question,
         session_id=request.session_id,
+        scenario=request.scenario,
     )
 
     return AskResponse(
@@ -157,4 +156,5 @@ async def ask(request: AskRequest) -> AskResponse:
         model=result.model,
         request_id=result.request_id,
         session_id=result.session_id,
+        scenario=result.scenario,
     )

@@ -19,26 +19,29 @@ from app.telemetry.metrics import (
     agent_run_duration,
 )
 from app.telemetry.tracing import tracer
+from app.core.scenarios import Scenario
 
 settings = get_settings()
 logger = get_logger(__name__)
 
 @dataclass(frozen=True)
 class AgentResult:
-    """Final result returned by the AI agent workflow."""
+    """Final result returned by the AI workflow."""
 
     answer: str
     provider: str
     model: str
     request_id: str
     session_id: str
+    scenario: Scenario
 
 
 def run_agent(
     question: str,
     session_id: str | None = None,
+    scenario: Scenario = Scenario.NORMAL,
 ) -> AgentResult:
-    """Run the complete simulated AI workflow."""
+    """Run the complete deterministic AI workflow."""
 
     request_id = str(uuid4())
     resolved_session_id = session_id or str(uuid4())
@@ -51,6 +54,7 @@ def run_agent(
     common_metric_attributes = {
         "agent_name": agent_name,
         "environment": settings.app_environment,
+        "scenario": scenario.value,
     }
 
     agent_run_count.add(
@@ -75,6 +79,10 @@ def run_agent(
             "app.session.id",
             resolved_session_id,
         )
+        span.set_attribute(
+            "app.scenario",
+            scenario.value,
+        )
 
         logger.info(
             "Agent run started",
@@ -82,6 +90,7 @@ def run_agent(
                 "event": "agent_run_started",
                 "operation": "agent.run",
                 "status": "started",
+                "scenario": scenario.value,
                 "agent_name": agent_name,
                 "agent_version": settings.app_version,
             },
@@ -90,16 +99,19 @@ def run_agent(
         try:
             retrieval_result = search_knowledge_base(
                 query=question,
+                scenario=scenario,
                 top_k=2,
             )
 
             prompt_result = render_prompt(
                 question=question,
                 context_documents=retrieval_result.documents,
+                scenario=scenario,
             )
 
             tool_result = execute_diagnostic_tool(
                 question=question,
+                scenario=scenario,
             )
 
             llm_result = generate_response(
@@ -107,10 +119,12 @@ def run_agent(
                 rendered_prompt=prompt_result.text,
                 context_documents=retrieval_result.documents,
                 tool_output=tool_result.output,
+                scenario=scenario,
             )
 
             validation_result = validate_response(
                 answer=llm_result.answer,
+                scenario=scenario,
             )
 
             span.set_attribute(
@@ -128,6 +142,7 @@ def run_agent(
                     "provider": llm_result.provider,
                     "model": llm_result.response_model,
                     "status": "success",
+                    "scenario": scenario.value,
                     "agent_name": agent_name,
                     "duration_ms": round(
                         duration_seconds * 1_000,
@@ -142,6 +157,7 @@ def run_agent(
                 model=llm_result.response_model,
                 request_id=request_id,
                 session_id=resolved_session_id,
+                scenario=scenario,
             )
 
         except Exception as error:
@@ -153,7 +169,6 @@ def run_agent(
             )
 
             span.record_exception(error)
-
             span.set_status(
                 Status(
                     StatusCode.ERROR,
@@ -175,6 +190,7 @@ def run_agent(
                     "event": "agent_run_failed",
                     "operation": "agent.run",
                     "status": "error",
+                    "scenario": scenario.value,
                     "agent_name": agent_name,
                     "error_category": "workflow_error",
                     "error_type": type(error).__name__,

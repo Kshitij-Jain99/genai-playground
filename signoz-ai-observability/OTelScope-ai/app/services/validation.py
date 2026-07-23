@@ -4,6 +4,9 @@ from dataclasses import dataclass
 
 from app.telemetry.tracing import tracer
 from app.telemetry.logging import get_logger
+from time import sleep
+
+from app.core.scenarios import Scenario, get_scenario_timings
 
 logger = get_logger(__name__)
 
@@ -15,19 +18,30 @@ class ValidationResult:
     rule_count: int
 
 
-def validate_response(answer: str) -> ValidationResult:
+def validate_response(
+    answer: str,
+    scenario: Scenario,
+) -> ValidationResult:
     """Validate the simulated AI response."""
 
+    timings = get_scenario_timings(scenario)
+
     with tracer.start_as_current_span("response.validate") as span:
+        sleep(timings.validation_seconds)
+
         validation_rules = [
             bool(answer.strip()),
-            len(answer) <= 5_000,
+            len(answer) <= 50_000,
             "api_key" not in answer.lower(),
         ]
 
         passed = all(validation_rules)
         rule_count = len(validation_rules)
 
+        span.set_attribute(
+            "app.scenario",
+            scenario.value,
+        )
         span.set_attribute(
             "app.validation.passed",
             passed,
@@ -48,6 +62,7 @@ def validate_response(answer: str) -> ValidationResult:
                     "event": "response_validation_failed",
                     "operation": "response.validate",
                     "status": "error",
+                    "scenario": scenario.value,
                     "validation_rule_count": rule_count,
                     "response_length": len(answer),
                 },
@@ -63,6 +78,7 @@ def validate_response(answer: str) -> ValidationResult:
                 "event": "response_validation_completed",
                 "operation": "response.validate",
                 "status": "success",
+                "scenario": scenario.value,
                 "validation_rule_count": rule_count,
                 "response_length": len(answer),
             },

@@ -1,51 +1,36 @@
-"""Request and response models for the AI endpoint."""
+"""Request and response models for the chat API."""
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
+
+from app.core.scenarios import Scenario
 
 
 class AskRequest(BaseModel):
-    """A user's question submitted to the simulated AI assistant."""
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "examples": [
-                {
-                    "question": "Why is my API slow?",
-                    "session_id": "demo-session-001",
-                }
-            ]
-        }
-    )
+    """Request body for the agent workflow."""
 
     question: str = Field(
-        ...,
         min_length=1,
         max_length=2_000,
-        description="Technical question submitted to the assistant.",
     )
 
     session_id: str | None = Field(
         default=None,
-        min_length=1,
-        max_length=128,
-        description=(
-            "Optional non-sensitive session identifier."
-        ),
+        max_length=200,
     )
+
+    scenario: Scenario = Scenario.NORMAL
 
     @field_validator("question")
     @classmethod
     def validate_question(cls, value: str) -> str:
-        """Trim surrounding whitespace and reject blank questions."""
+        """Trim and reject blank questions."""
 
-        normalized_question = value.strip()
+        normalized_value = value.strip()
 
-        if not normalized_question:
-            raise ValueError(
-                "Question must not be empty or contain only whitespace."
-            )
+        if not normalized_value:
+            raise ValueError("Question must not be blank.")
 
-        return normalized_question
+        return normalized_value
 
     @field_validator("session_id")
     @classmethod
@@ -53,45 +38,25 @@ class AskRequest(BaseModel):
         cls,
         value: str | None,
     ) -> str | None:
-        """Normalize and validate the optional session identifier."""
+        """Trim and reject explicitly blank session identifiers."""
 
         if value is None:
             return None
 
-        normalized_session_id = value.strip()
+        normalized_value = value.strip()
 
-        if not normalized_session_id:
-            raise ValueError(
-                "Session ID must not contain only whitespace."
-            )
+        if not normalized_value:
+            raise ValueError("Session ID must not be blank.")
 
-        return normalized_session_id
+        return normalized_value
 
 
 class AskResponse(BaseModel):
-    """Response returned by the simulated AI assistant."""
+    """Response returned by the agent workflow."""
 
-    answer: str = Field(
-        ...,
-        description="Generated simulated answer.",
-    )
-
-    provider: str = Field(
-        ...,
-        description="Configured LLM provider.",
-    )
-
-    model: str = Field(
-        ...,
-        description="Configured LLM model.",
-    )
-
-    request_id: str = Field(
-        ...,
-        description="Identifier used to correlate the request with telemetry.",
-    )
-
-    session_id: str = Field(
-        ...,
-        description="Non-sensitive conversation session identifier.",
-    )
+    answer: str
+    provider: str
+    model: str
+    request_id: str
+    session_id: str
+    scenario: Scenario

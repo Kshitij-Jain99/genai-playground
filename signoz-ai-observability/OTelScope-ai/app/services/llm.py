@@ -13,6 +13,9 @@ from app.telemetry.metrics import (
 )
 from app.telemetry.tracing import tracer
 from app.telemetry.logging import get_logger
+from time import perf_counter, sleep
+
+from app.core.scenarios import Scenario, get_scenario_timings
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -68,6 +71,7 @@ def generate_response(
     rendered_prompt: str,
     context_documents: list[str],
     tool_output: str,
+    scenario: Scenario,
 ) -> LLMResult:
     """Generate a deterministic simulated LLM response."""
 
@@ -78,15 +82,23 @@ def generate_response(
     response_model = settings.llm_model
     operation = "chat"
 
+    timings = get_scenario_timings(scenario)
+
     metric_attributes = {
         "provider": provider,
         "model": requested_model,
         "environment": settings.app_environment,
         "operation": operation,
+        "scenario": scenario.value,
     }
 
     try:
         with tracer.start_as_current_span("llm.generate") as span:
+            span.set_attribute(
+                "app.scenario",
+                scenario.value,
+            )
+
             logger.info(
                 "LLM request started",
                 extra={
@@ -95,21 +107,31 @@ def generate_response(
                     "provider": provider,
                     "model": requested_model,
                     "status": "started",
+                    "scenario": scenario.value,
                 },
             )
 
-            if should_simulate_failure(question):
+            sleep(timings.llm_seconds)
+
+            if scenario == Scenario.FAILURE:
                 raise RuntimeError(
                     "Simulated LLM provider failure."
                 )
 
-            context_summary = context_documents[0]
-
-            answer = (
-                f"Simulated troubleshooting answer for: {question}. "
-                f"Relevant context: {context_summary} "
-                f"Diagnostic result: {tool_output}"
+            context_summary = (
+                context_documents[0]
+                if context_documents
+                else "No retrieval context was available."
             )
+
+            if scenario == Scenario.HIGH_TOKEN:
+                answer = create_high_token_answer()
+            else:
+                answer = (
+                    f"Simulated troubleshooting answer for: {question}. "
+                    f"Relevant context: {context_summary} "
+                    f"Diagnostic result: {tool_output}"
+                )
 
             input_tokens = estimate_token_count(rendered_prompt)
             output_tokens = estimate_token_count(answer)
@@ -175,17 +197,14 @@ def generate_response(
                 1,
                 attributes=success_attributes,
             )
-
             gen_ai_input_tokens.add(
                 input_tokens,
                 attributes=success_attributes,
             )
-
             gen_ai_output_tokens.add(
                 output_tokens,
                 attributes=success_attributes,
             )
-
             gen_ai_estimated_cost.add(
                 estimated_cost,
                 attributes=success_attributes,
@@ -201,10 +220,14 @@ def generate_response(
                     "provider": provider,
                     "model": response_model,
                     "status": "success",
+                    "scenario": scenario.value,
                     "finish_reason": finish_reason,
                     "input_tokens": input_tokens,
                     "output_tokens": output_tokens,
-                    "estimated_cost": round(estimated_cost, 8),
+                    "estimated_cost": round(
+                        estimated_cost,
+                        8,
+                    ),
                     "duration_ms": round(
                         duration_seconds * 1_000,
                         3,
@@ -240,6 +263,7 @@ def generate_response(
                 "provider": provider,
                 "model": requested_model,
                 "status": "error",
+                "scenario": scenario.value,
                 "retry_count": 0,
                 "error_category": "provider_error",
                 "error_type": type(error).__name__,
@@ -253,5 +277,24 @@ def generate_response(
 
         gen_ai_request_duration.record(
             duration_seconds,
-            attributes=metric_attributes,
+            attributes={
+                **metric_attributes,
+                "status": (
+                    "error"
+                    if scenario == Scenario.FAILURE
+                    else "success"
+                ),
+            },
         )
+
+def create_high_token_answer() -> str:
+    """Create a deterministic large response for token dashboards."""
+
+    paragraph = (
+        "OpenTelemetry traces reveal latency across application operations, "
+        "metrics show aggregate performance and error behaviour, and "
+        "structured logs provide detailed correlated diagnostic context. "
+    )
+
+    return paragraph * 120
+

@@ -124,3 +124,80 @@ def test_ask_returns_safe_error_for_simulated_llm_failure() -> None:
     assert response.json() == {
         "detail": "The simulated AI provider is unavailable."
     }    
+
+def test_ask_defaults_to_normal_scenario() -> None:
+    response = client.post(
+        "/ask",
+        json={
+            "question": "Why is my API slow?"
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["scenario"] == "normal"
+
+
+def test_retrieval_empty_scenario_succeeds() -> None:
+    response = client.post(
+        "/ask",
+        json={
+            "question": "Find diagnostic context.",
+            "scenario": "retrieval-empty",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["scenario"] == "retrieval-empty"
+
+
+def test_high_token_scenario_returns_large_answer() -> None:
+    response = client.post(
+        "/ask",
+        json={
+            "question": "Explain observability.",
+            "scenario": "high-token",
+        },
+    )
+
+    assert response.status_code == 200
+    assert len(response.json()["answer"]) > 5_000
+
+
+def test_llm_failure_scenario_returns_503() -> None:
+    response = client.post(
+        "/ask",
+        json={
+            "question": "Test provider failure.",
+            "scenario": "failure",
+        },
+    )
+
+    assert response.status_code == 503
+
+    assert response.json() == {
+        "detail": "A simulated downstream operation failed."
+    }
+
+
+def test_tool_failure_scenario_returns_503() -> None:
+    response = client.post(
+        "/ask",
+        json={
+            "question": "Check service health.",
+            "scenario": "tool-failure",
+        },
+    )
+
+    assert response.status_code == 503
+
+
+def test_unknown_scenario_is_rejected() -> None:
+    response = client.post(
+        "/ask",
+        json={
+            "question": "Test invalid scenario.",
+            "scenario": "random",
+        },
+    )
+
+    assert response.status_code == 422   

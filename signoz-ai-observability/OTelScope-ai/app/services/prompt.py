@@ -3,6 +3,9 @@
 from dataclasses import dataclass
 
 from app.telemetry.tracing import tracer
+from time import sleep
+
+from app.core.scenarios import Scenario, get_scenario_timings
 
 
 @dataclass(frozen=True)
@@ -17,45 +20,50 @@ class RenderedPrompt:
 def render_prompt(
     question: str,
     context_documents: list[str],
-) -> RenderedPrompt:
+    scenario: Scenario,
+) -> PromptResult:
     """Create the simulated LLM prompt."""
 
-    with tracer.start_as_current_span("prompt.render") as span:
-        template_name = "technical-support"
-        template_version = "1.0"
+timings = get_scenario_timings(scenario)
 
-        context = "\n".join(context_documents)
+with tracer.start_as_current_span("prompt.render") as span:
+    sleep(timings.prompt_seconds)
 
-        rendered_text = (
-            "You are a technical troubleshooting assistant.\n"
-            "Use the supplied context when relevant.\n\n"
-            f"Context:\n{context}\n\n"
-            f"Question:\n{question}"
-        )
+    context_text = "\n".join(context_documents)
 
-        span.set_attribute(
-            "app.prompt.template_name",
-            template_name,
-        )
-        span.set_attribute(
-            "app.prompt.template_version",
-            template_version,
-        )
-        span.set_attribute(
-            "app.prompt.question_length",
-            len(question),
-        )
-        span.set_attribute(
-            "app.prompt.context_document_count",
-            len(context_documents),
-        )
-        span.set_attribute(
-            "app.prompt.rendered_length",
-            len(rendered_text),
-        )
+    rendered_prompt = (
+        "You are a technical support assistant.\n\n"
+        f"Context:\n{context_text}\n\n"
+        f"Question:\n{question}"
+    )
 
-        return RenderedPrompt(
-            text=rendered_text,
-            template_name=template_name,
-            template_version=template_version,
-        )
+    span.set_attribute(
+        "app.scenario",
+        scenario.value,
+    )
+    span.set_attribute(
+        "app.prompt.template_name",
+        "technical-support",
+    )
+    span.set_attribute(
+        "app.prompt.template_version",
+        "1.0",
+    )
+    span.set_attribute(
+        "app.prompt.question_length",
+        len(question),
+    )
+    span.set_attribute(
+        "app.prompt.rendered_length",
+        len(rendered_prompt),
+    )
+    span.set_attribute(
+        "app.prompt.context_count",
+        len(context_documents),
+    )
+
+    return PromptResult(
+        text=rendered_prompt,
+        template_name="technical-support",
+        template_version="1.0",
+    )

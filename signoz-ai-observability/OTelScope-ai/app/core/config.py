@@ -44,6 +44,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    simulate_operation_delays: bool = True
 
 @lru_cache
 def get_settings() -> Settings:

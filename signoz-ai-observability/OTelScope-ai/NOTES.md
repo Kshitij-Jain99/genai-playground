@@ -460,7 +460,7 @@ SigNoz Metrics
 
 //--------------------------------------------------------------------
 
-Phase-10: Structured Logs with Trace Correlatio
+Phase-10: Structured Logs with Trace Correlation
 It adds structured application logs to the traces and metrics already implemented.
 A request will produce:
 POST /ask trace
@@ -554,3 +554,30 @@ OTLP/HTTP :4318
         │
         ▼
 SigNoz    
+
+
+//---------------------------------------------------------------------
+
+Phase-11: Build Realistic Deterministic Behaviour
+Adds six controlled scenarios: normal, slow, failure, high-token, tool-failure, retrieval-empty
+
+Update scenarios.py, chat.py, main.py, prompt.py, retrieval.py, tools.py, llm.py, validation.py, agent.py, main.py, test_main.py, config.py, scenario.py
+
+Test all scenarios:
+./scripts/run-dev.sh -> http://localhost:8001/docs
+./scripts/run-with-otel.sh -> http://localhost:8001/docs
+
+Verify metrices, Filter or group metrics by: 6 Scenarios
+
+Final verification: 
+python -m compileall app tests
+SIMULATE_OPERATION_DELAYS=false python -m pytest -v
+python -m pip check
+bash -n scripts/run-dev.sh
+bash -n scripts/run-with-otel.sh
+git status --short
+
+
+//---------------------------------------------------------------------
+
+Phase-12: 
