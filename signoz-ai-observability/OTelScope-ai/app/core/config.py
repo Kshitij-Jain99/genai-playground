@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     llm_model: str = "demo-model"
     llm_api_key: str | None = None
 
+    # Simulated pricing used only for learning and metric generation
+    llm_input_cost_per_1k_tokens: float = 0.001
+    llm_output_cost_per_1k_tokens: float = 0.002    
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

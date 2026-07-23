@@ -398,6 +398,63 @@ Remove scripts.ccler file if its empty:
 rm scripts/ccler
 
 
+//---------------------------------------------------------------------
 
+Phase-9: Add Application Metrics
+It adds metrics to the existing workflow without changing the span hierarchy.
+OpenTelemetry supports synchronous Counter and Histogram instruments through a shared Meter. Counters are suitable for cumulative values such as requests, tokens, errors, and cost; histograms are suitable for durations.
 
+Updated metrics.py, config.py, llm.py, retrieval.py, tools.py, agent.py
+source .venv/bin/activate
+python -m compileall app tests
+./scripts/run-dev.sh -> http://localhost:8001/docs
+./scripts/run-with-otel.sh -> http://localhost:8001/docs -> http://localhost:8080 -> Metrices(search for metrices in metrics-explorer)
+
+Confirm forbidden attributes are absent from metrices: request_id, session_id, user_id, question, prompt, answer, api_key, authorization, trace_id as a metric attribute, span_id as a metric, attribute
+
+Update test_llm.py
+python -m pytest -v
+python -m compileall app tests
+python -m pytest -v
+python -m pip check
+bash -n scripts/run-with-otel.sh
+git status --short
+git status --ignored --short
+
+Architecture:
+POST /ask
+   │
+   ▼
+agent.run
+   │
+   ├── Counter: app.agent.run.count
+   ├── Histogram: app.agent.run.duration
+   └── Counter: app.agent.error.count
+   │
+   ├── retrieval.search
+   │      └── Histogram: app.retrieval.duration
+   │
+   ├── tool.execute
+   │      └── Counter: app.tool.execution.count
+   │
+   └── llm.generate
+          ├── Counter: app.gen_ai.request.count
+          ├── Counter: app.gen_ai.input_tokens
+          ├── Counter: app.gen_ai.output_tokens
+          ├── Counter: app.gen_ai.estimated_cost
+          └── Histogram: app.gen_ai.request.duration
+
+Telemetry Flow:
+Application metric instruments
+        │
+        ▼
+OpenTelemetry MeterProvider
+configured by opentelemetry-instrument
+        │
+        ▼
+OTLP/HTTP
+localhost:4318
+        │
+        ▼
+SigNoz Metrics          
 

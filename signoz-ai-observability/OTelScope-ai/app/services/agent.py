@@ -1,6 +1,7 @@
 """Main AI agent workflow orchestration service."""
 
 from dataclasses import dataclass
+from time import perf_counter
 from uuid import uuid4
 
 from opentelemetry.trace import Status, StatusCode
@@ -11,6 +12,11 @@ from app.services.prompt import render_prompt
 from app.services.retrieval import search_knowledge_base
 from app.services.tools import execute_diagnostic_tool
 from app.services.validation import validate_response
+from app.telemetry.metrics import (
+    agent_error_count,
+    agent_run_count,
+    agent_run_duration,
+)
 from app.telemetry.tracing import tracer
 
 settings = get_settings()
@@ -35,6 +41,19 @@ def run_agent(
 
     request_id = str(uuid4())
     resolved_session_id = session_id or str(uuid4())
+
+    started_at = perf_counter()
+    status = "success"
+
+    common_metric_attributes = {
+        "agent_name": "technical-support-agent",
+        "environment": settings.app_environment,
+    }
+
+    agent_run_count.add(
+        1,
+        attributes=common_metric_attributes,
+    )
 
     with tracer.start_as_current_span("agent.run") as span:
         span.set_attribute(
@@ -94,15 +113,39 @@ def run_agent(
             )
 
         except Exception as error:
+            status = "error"
+
             span.set_attribute(
                 "app.agent.success",
                 False,
             )
+
             span.record_exception(error)
+
             span.set_status(
                 Status(
                     StatusCode.ERROR,
                     str(error),
                 )
             )
+
+            agent_error_count.add(
+                1,
+                attributes={
+                    **common_metric_attributes,
+                    "error_type": type(error).__name__,
+                },
+            )
+
             raise
+
+        finally:
+            duration_seconds = perf_counter() - started_at
+
+            agent_run_duration.record(
+                duration_seconds,
+                attributes={
+                    **common_metric_attributes,
+                    "status": status,
+                },
+            )
