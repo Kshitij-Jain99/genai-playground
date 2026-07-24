@@ -1,13 +1,9 @@
 """Deterministic demonstration scenarios and simulated timings."""
 
+import os
 from dataclasses import dataclass
 from enum import StrEnum
 from time import sleep
-
-from app.core.config import get_settings
-
-settings = get_settings()
-
 
 class Scenario(StrEnum):
     """Supported deterministic application scenarios."""
@@ -65,5 +61,15 @@ def simulate_delay(seconds: float) -> None:
     if seconds < 0:
         raise ValueError("Delay must not be negative.")
 
-    if settings.simulate_operation_delays:
+    enabled = os.getenv(
+        "SIMULATE_OPERATION_DELAYS",
+        "true",
+    ).lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+    if enabled:
         sleep(seconds)

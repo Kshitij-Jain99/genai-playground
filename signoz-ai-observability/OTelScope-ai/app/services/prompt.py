@@ -2,15 +2,20 @@
 
 from dataclasses import dataclass
 
-from app.telemetry.tracing import tracer
-from time import sleep
+from opentelemetry import trace
 
-from app.core.scenarios import Scenario, get_scenario_timings
+from app.core.scenarios import (
+    Scenario,
+    get_scenario_timings,
+    simulate_delay,
+)
+
+tracer = trace.get_tracer(__name__)
 
 
 @dataclass(frozen=True)
-class RenderedPrompt:
-    """Internal representation of a rendered prompt."""
+class PromptResult:
+    """Rendered prompt metadata."""
 
     text: str
     template_name: str
@@ -22,48 +27,48 @@ def render_prompt(
     context_documents: list[str],
     scenario: Scenario,
 ) -> PromptResult:
-    """Create the simulated LLM prompt."""
+    """Render the deterministic technical-support prompt."""
 
-timings = get_scenario_timings(scenario)
+    timings = get_scenario_timings(scenario)
 
-with tracer.start_as_current_span("prompt.render") as span:
-    sleep(timings.prompt_seconds)
+    with tracer.start_as_current_span("prompt.render") as span:
+        simulate_delay(timings.prompt_seconds)
 
-    context_text = "\n".join(context_documents)
+        context_text = "\n".join(context_documents)
 
-    rendered_prompt = (
-        "You are a technical support assistant.\n\n"
-        f"Context:\n{context_text}\n\n"
-        f"Question:\n{question}"
-    )
+        rendered_prompt = (
+            "You are a technical support assistant.\n\n"
+            f"Context:\n{context_text}\n\n"
+            f"Question:\n{question}"
+        )
 
-    span.set_attribute(
-        "app.scenario",
-        scenario.value,
-    )
-    span.set_attribute(
-        "app.prompt.template_name",
-        "technical-support",
-    )
-    span.set_attribute(
-        "app.prompt.template_version",
-        "1.0",
-    )
-    span.set_attribute(
-        "app.prompt.question_length",
-        len(question),
-    )
-    span.set_attribute(
-        "app.prompt.rendered_length",
-        len(rendered_prompt),
-    )
-    span.set_attribute(
-        "app.prompt.context_count",
-        len(context_documents),
-    )
+        span.set_attribute(
+            "app.scenario",
+            scenario.value,
+        )
+        span.set_attribute(
+            "app.prompt.template_name",
+            "technical-support",
+        )
+        span.set_attribute(
+            "app.prompt.template_version",
+            "1.0",
+        )
+        span.set_attribute(
+            "app.prompt.question_length",
+            len(question),
+        )
+        span.set_attribute(
+            "app.prompt.rendered_length",
+            len(rendered_prompt),
+        )
+        span.set_attribute(
+            "app.prompt.context_count",
+            len(context_documents),
+        )
 
-    return PromptResult(
-        text=rendered_prompt,
-        template_name="technical-support",
-        template_version="1.0",
-    )
+        return PromptResult(
+            text=rendered_prompt,
+            template_name="technical-support",
+            template_version="1.0",
+        )

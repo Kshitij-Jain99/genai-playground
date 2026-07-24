@@ -114,16 +114,17 @@ def test_ask_returns_safe_error_for_simulated_llm_failure() -> None:
     response = client.post(
         "/ask",
         json={
-            "question": "simulate llm failure",
+            "question": "Test an LLM provider failure.",
             "session_id": "test-session",
+            "scenario": "failure",
         },
     )
 
     assert response.status_code == 503
 
     assert response.json() == {
-        "detail": "The simulated AI provider is unavailable."
-    }    
+        "detail": "A simulated downstream operation failed."
+    }
 
 def test_ask_defaults_to_normal_scenario() -> None:
     response = client.post(

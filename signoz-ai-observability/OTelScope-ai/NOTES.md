@@ -567,11 +567,21 @@ Test all scenarios:
 ./scripts/run-dev.sh -> http://localhost:8001/docs
 ./scripts/run-with-otel.sh -> http://localhost:8001/docs
 
-Verify metrices, Filter or group metrics by: 6 Scenarios
+Verify metrices, Filter or group metrics by:
+-> POST /ask → Try it out: Normal scenario, Slow scenario, LLM failure scenario, Tool failure scenario, High-token scenario, Empty retrieval scenario, Invalid scenario
+-> Verify traces in SigNoz: Services → otelscope-ai-api → Traces [Check that each span contains: app.scenario]
+-> Verify logs in SigNoz: Search agent_run_completed, llm_request_failed, tool_execution_failed
+-> Verify metrics: Search for these group by scenario: app.agent.run.duration
+app.agent.error.count
+app.gen_ai.request.duration
+app.gen_ai.output_tokens
+app.gen_ai.estimated_cost
+app.retrieval.duration
+app.tool.execution.count
 
 Final verification: 
 python -m compileall app tests
-SIMULATE_OPERATION_DELAYS=false python -m pytest -v
+SIMULATE_OPERATION_DELAYS=false python -m pytest -v -> All test must pass
 python -m pip check
 bash -n scripts/run-dev.sh
 bash -n scripts/run-with-otel.sh
@@ -580,4 +590,86 @@ git status --short
 
 //---------------------------------------------------------------------
 
-Phase-12: 
+Phase-12: Collector Internal Telemetry
+1. Identify which Collector your application is using.
+2. Enable and export its internal metrics.
+3. Verify the exact metric names in SigNoz.
+4. Build the dashboard and collector_instance variable.
+The Collector exposes internal metrics on 127.0.0.1:8888/metrics by default. Recent Collector versions configure this through service.telemetry.metrics.readers; metric names and available dimensions can change between versions, so inspect the received metrics before building panels.
+
+Upto Phase-11: Monitering AI Application,
+Phase 12 is about monitoring the OpenTelemetry Collector itself.
+The Collector is the middle layer. If it becomes slow, overloaded, drops data, or cannot export data, your dashboards may become incomplete even when your application is running correctly.
+Monitoring only the AI app would leave a blind spot.
+AI application observability (sender)
++
+OpenTelemetry pipeline observability (delivery truck)
++
+SigNoz dashboards (warehouse)
+
+Identify the Collector container
+docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Ports}}" -> container with name/image includes [otel,collector, signoz, ingester]
+docker inspect <collector-container-name> \  
+  --format '{{json .Config.Cmd}}'            -> Inspet its command
+docker inspect <collector-container-name> \
+  --format '{{json .Mounts}}'               -> Look for configuration path of config.yaml
+
+Conceptually:
+OTelScope AI (http://localhost:8001)
+   │
+   │ traces, metrics, logs
+   ▼
+signoz-ingester-1 (my container name)
+   │ (127.0.0.1:8888)
+   ▼
+SigNoz storage (http://localhost:8080)
+
+cp /path/to/otel-collector-config.yaml \      
+   /path/to/otel-collector-config.yaml.backup -> Back up the Collector configuration(ingester.yaml in my case)
+
+docker restart signoz-ingester-1
+docker ps --filter "name=signoz-ingester-1" -> Confirm the Collector is healthy
+docker logs --tail 100 signoz-ingester-1
+
+docker inspect signoz-ingester-1 \
+  --format '{{.Config.Image}}'
+docker image inspect signoz/signoz-otel-collector:latest \
+  --format '{{json .RepoDigests}}'
+docker image inspect signoz/signoz-otel-collector:latest \
+  --format '{{json .Config.Labels}}'
+
+Update ingester.yaml file
+docker restart signoz-ingester-1
+docker ps --filter "name=signoz-ingester-1"
+docker logs --since 2m signoz-ingester-1
+
+Publish port 8888 for browser testing
+grep -Rni \
+  "signoz/signoz-otel-collector" \
+  /home/../../pours/deployment
+Inside the signoz-ingester-1 service definition, change the ports:
+ports:
+  - "4317:4317"
+  - "4318:4318"
+  - "8888:8888"
+docker compose \
+  -f /home/../../pours/deployment/compose.yaml \
+  config --services
+docker compose \
+  -f /home/../../pours/deployment/compose.yaml \
+  up -d --force-recreate ingester
+docker ps --filter "name=signoz-ingester-1"
+docker ps --format "table {{.Names}}\t{{.Ports}}" \
+  | grep signoz-ingester
+docker logs --since 2m signoz-ingester-1
+
+Now:
+Collector creates health metrics
+        ↓
+Port 8888 exposes them
+        ↓
+prometheus/collector-internal scrapes them
+        ↓
+metrics/collector-internal exports them
+        ↓
+SigNoz stores them
