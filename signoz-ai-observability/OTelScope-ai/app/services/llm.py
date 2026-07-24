@@ -113,7 +113,7 @@ def generate_response(
 
             sleep(timings.llm_seconds)
 
-            if scenario == Scenario.FAILURE:
+            if scenario in {Scenario.ERROR, Scenario.FAILURE}:
                 raise RuntimeError(
                     "Simulated LLM provider failure."
                 )
@@ -281,7 +281,7 @@ def generate_response(
                 **metric_attributes,
                 "status": (
                     "error"
-                    if scenario == Scenario.FAILURE
+                    if scenario in {Scenario.ERROR, Scenario.FAILURE}
                     else "success"
                 ),
             },
@@ -297,4 +297,3 @@ def create_high_token_answer() -> str:
     )
 
     return paragraph * 120
-

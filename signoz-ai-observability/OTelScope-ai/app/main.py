@@ -44,16 +44,6 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         },
     )
 
-    print(
-        f"Starting {settings.app_name} "
-        f"version={settings.app_version} "
-        f"environment={settings.app_environment}"
-    )
-
-    yield
-
-    print(f"Stopping {settings.app_name}")
-
 
 app = FastAPI(
     title=settings.app_name,
@@ -67,10 +57,22 @@ app = FastAPI(
 
 @app.exception_handler(RuntimeError)
 async def runtime_error_handler(
-    _: Request,
+    request: Request,
     error: RuntimeError,
 ) -> JSONResponse:
     """Return a safe response for simulated failures."""
+
+    scenario = "unknown"
+    status_code = 503
+
+    try:
+        request_body = await request.json()
+        scenario = request_body.get("scenario", "normal")
+    except Exception:
+        pass
+
+    if scenario == "error":
+        status_code = 500
 
     logger.error(
         "Request failed",
@@ -78,13 +80,14 @@ async def runtime_error_handler(
             "event": "request_failed",
             "operation": "POST /ask",
             "status": "error",
+            "scenario": scenario,
             "error_category": "simulated_dependency_error",
             "error_type": type(error).__name__,
         },
     )
 
     return JSONResponse(
-        status_code=503,
+        status_code=status_code,
         content={
             "detail": "A simulated downstream operation failed."
         },

@@ -10,6 +10,7 @@ class Scenario(StrEnum):
 
     NORMAL = "normal"
     SLOW = "slow"
+    ERROR = "error"
     FAILURE = "failure"
     HIGH_TOKEN = "high-token"
     TOOL_FAILURE = "tool-failure"

@@ -124,11 +124,24 @@ def configure_logging() -> None:
     log_level_name = settings.app_log_level.upper()
     log_level = getattr(logging, log_level_name, logging.INFO)
 
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(JsonLogFormatter())
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(JsonLogFormatter())
+
+    # Auto-instrumentation installs an OpenTelemetry handler before importing
+    # the application. Preserve it so records are exported over OTLP as well as
+    # written as JSON to stdout.
+    otel_handlers = [
+        handler
+        for handler in root_logger.handlers
+        if handler.__class__.__module__.startswith("opentelemetry.")
+    ]
 
     root_logger.handlers.clear()
-    root_logger.addHandler(handler)
+    root_logger.addHandler(console_handler)
+
+    for otel_handler in otel_handlers:
+        root_logger.addHandler(otel_handler)
+
     root_logger.setLevel(log_level)
 
     root_logger._otelscope_configured = True  # type: ignore[attr-defined]

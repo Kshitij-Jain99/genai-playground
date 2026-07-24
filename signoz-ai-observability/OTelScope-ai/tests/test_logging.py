@@ -2,7 +2,9 @@
 
 import json
 import logging
+import sys
 
+import app.telemetry.logging as telemetry_logging
 from app.telemetry.logging import JsonLogFormatter
 
 
@@ -70,3 +72,55 @@ def test_json_formatter_does_not_include_message_by_default() -> None:
     log_data = json.loads(formatter.format(record))
 
     assert "message" not in log_data
+
+
+def test_configure_logging_preserves_otel_handlers(
+    monkeypatch,
+) -> None:
+    class FakeOtelHandler(logging.Handler):
+        __module__ = "opentelemetry.sdk._logs"
+
+        def emit(self, record: logging.LogRecord) -> None:
+            pass
+
+    root_logger = logging.getLogger()
+    original_handlers = root_logger.handlers[:]
+    original_level = root_logger.level
+    had_configured_flag = hasattr(
+        root_logger,
+        "_otelscope_configured",
+    )
+    original_configured = getattr(
+        root_logger,
+        "_otelscope_configured",
+        None,
+    )
+    otel_handler = FakeOtelHandler()
+
+    try:
+        root_logger.handlers = [otel_handler]
+        monkeypatch.delattr(
+            root_logger,
+            "_otelscope_configured",
+            raising=False,
+        )
+
+        telemetry_logging.configure_logging()
+
+        assert otel_handler in root_logger.handlers
+        assert any(
+            isinstance(handler, logging.StreamHandler)
+            and handler.stream is sys.stdout
+            for handler in root_logger.handlers
+        )
+    finally:
+        root_logger.handlers = original_handlers
+        root_logger.setLevel(original_level)
+
+        if had_configured_flag:
+            root_logger._otelscope_configured = original_configured
+        else:
+            root_logger.__dict__.pop(
+                "_otelscope_configured",
+                None,
+            )

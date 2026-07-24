@@ -126,6 +126,22 @@ def test_ask_returns_safe_error_for_simulated_llm_failure() -> None:
         "detail": "A simulated downstream operation failed."
     }
 
+
+def test_error_scenario_returns_500() -> None:
+    response = client.post(
+        "/ask",
+        json={
+            "question": "Demonstrate an application error.",
+            "scenario": "error",
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "A simulated downstream operation failed."
+    }
+
+
 def test_ask_defaults_to_normal_scenario() -> None:
     response = client.post(
         "/ask",
@@ -201,4 +217,4 @@ def test_unknown_scenario_is_rejected() -> None:
         },
     )
 
-    assert response.status_code == 422   
+    assert response.status_code == 422

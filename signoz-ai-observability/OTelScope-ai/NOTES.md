@@ -751,3 +751,69 @@ Services for request traffic
 Traces for normal, slow, high-token, and error requests
 Logs for correlated application logs
 Metrics for request counts, latency, tokens, cost, and errors
+
+//-----------------------------------------------------------------------
+
+Phase-14: Validate telemetry before dashboards
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" -> All req. containers should be working
+./scripts/run-with-otel.sh -> http://127.0.0.1:8001/docs (1 ask req)
+python scripts/generate-demo-traffic.py \
+  --count 20 \
+  --interval 1                        -> http://localhost:8080
+Go to Trace(service.name = otelscope-ai)  
+ - Validated the complete telemetry pipeline before dashboard creation
+    using an exact 20-request cycle: 14 normal, 3 slow, 2 high-token,
+    and 1 error.
+
+  - Verified traces in SigNoz:
+      - POST /ask is the root span.
+      - agent.run is correctly nested.
+      - Retrieval, prompt, tool, LLM, and validation child spans
+        appear.
+
+      - Error spans have ERROR status and exception events.
+      - GenAI provider, model, operation, token, and scenario
+        attributes are present.
+
+      - Trace durations match client-observed durations.
+
+  - Added the missing error scenario in app/core/scenarios.py. Updated
+    app/services/llm.py so this scenario generates the intentional
+    failure.
+
+  - Updated app/main.py:
+      - The demo error scenario now returns HTTP 500.
+      - Removed an invalid duplicate lifespan yield.
+
+  - Fixed log exporting in app/telemetry/logging.py by preserving
+    OpenTelemetry’s OTLP logging handler.
+
+  - Verified metrics:
+      - Request, error, and token counters increase.
+      - Duration histograms contain observations.
+      - Provider and model attributes are queryable.
+      - Units are correct.
+      - No high-cardinality request IDs, prompts, or trace IDs are
+        used.
+
+  - Verified logs:
+      - Logs contain structured fields and trace/span IDs.
+      - Error logs correlate with the failed trace.
+      - No secrets, full prompts, or full responses are exported.
+
+  - Verified Collector telemetry:
+      - Collector metrics appear on port 8888 and in SigNoz.
+      - Instance identity is local-collector-01.
+      - Receiver/exporter labels, queue size/capacity, and failure/
+        refusal counters are available.
+
+  - Added regression coverage in tests/test_main.py and tests/
+    test_logging.py.
+
+  - Recorded the final PASS result and supporting evidence in
+    VALIDATION.md.
+
+//-------------------------------------------------------------------
+
+Phase-15: 
+
