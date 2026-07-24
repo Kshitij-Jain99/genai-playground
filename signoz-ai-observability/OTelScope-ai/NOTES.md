@@ -663,6 +663,9 @@ docker ps --format "table {{.Names}}\t{{.Ports}}" \
   | grep signoz-ingester
 docker logs --since 2m signoz-ingester-1
 
+http://localhost:8888/metrics -> CTRL+F(otelcol_ and others search)
+http://localhost:8080 -> Metrices -> otelcol and others search
+
 Now:
 Collector creates health metrics
         ↓
@@ -673,3 +676,78 @@ prometheus/collector-internal scrapes them
 metrics/collector-internal exports them
         ↓
 SigNoz stores them
+
+
+//-----------------------------------------------------------------
+
+Phase-13: Create a repeatable traffic generator
+For creating a dashboard we need lot of requests.
+We need something like this: 
+App
+↑
+Traffic Generator every 2 seconds(delay)
+↓
+normal
+normal
+normal
+slow
+normal
+normal
+high-token
+normal
+error
+...
+
+After 5–10 minutes you have:
+hundreds of traces
+hundreds of logs
+metrics with trends
+realistic graphs
+enough data for screenshots
+
+Architecture:
+generate-demo-traffic.py
+            │
+            ▼
+localhost:8001/ask
+            │
+            ▼
+FastAPI
+            │
+            ▼
+OpenTelemetry
+            │
+            ▼
+Collector
+            │
+            ▼
+SigNoz
+
+Out of every 100 requests approximately: 70 normal, 15 slow, 10 expensive, 5 failures
+This makes dashboards predictable.
+The script uses an exact 20-request cycle: 
+14 normal      = 70%
+3 slow         = 15%
+2 high-token   = 10%
+1 error        = 5%
+
+Update generate-demo-traffic.py
+chmod +x scripts/generate-demo-traffic.py
+ls -l scripts/generate-demo-traffic.py
+./scripts/run-with-otel.sh -> http://127.0.0.1:8001/docs
+
+New terminal:
+source .venv/bin/activate
+python scripts/generate-demo-traffic.py \
+  --count 20 \
+  --interval 1
+python scripts/generate-demo-traffic.py \
+  --count 100 \
+  --interval 0.5
+
+Open: http://localhost:8080
+Check:
+Services for request traffic
+Traces for normal, slow, high-token, and error requests
+Logs for correlated application logs
+Metrics for request counts, latency, tokens, cost, and errors
